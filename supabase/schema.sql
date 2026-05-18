@@ -39,7 +39,10 @@ create table if not exists public.tattoo_drafts (
 );
 
 alter table public.tattoo_drafts
+  add column if not exists client_id text,
   add column if not exists user_id uuid,
+  add column if not exists user_name text,
+  add column if not exists profile_gender text,
   add column if not exists title text default 'Rascunho sem nome',
   add column if not exists answers jsonb default '{}'::jsonb,
   add column if not exists reading jsonb default '{}'::jsonb,
@@ -49,6 +52,7 @@ alter table public.tattoo_drafts
   add column if not exists updated_at timestamptz default now();
 
 alter table public.tattoo_drafts
+  alter column client_id drop not null,
   alter column user_id drop not null;
 
 create index if not exists tattoo_drafts_user_updated_idx

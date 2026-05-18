@@ -437,8 +437,11 @@ const handleCreateDraft = async (request, env) => {
     serviceRole: true,
     prefer: "return=representation",
     body: {
+      client_id: user.id,
       user_id: user.id,
       title: cleanText(body.title, "Rascunho sem nome"),
+      user_name: cleanText(body.answers?.identityName, user.user_metadata?.name || user.email || null),
+      profile_gender: cleanText(body.answers?.profileGender, null),
       answers: body.answers || {},
       reading,
       active_index: reading.activeIndex,
@@ -467,7 +470,10 @@ const handleUpdateDraft = async (request, env, id) => {
       serviceRole: true,
       prefer: "return=representation",
       body: {
+        client_id: user.id,
         title: cleanText(body.title, "Rascunho sem nome"),
+        user_name: cleanText(body.answers?.identityName, user.user_metadata?.name || user.email || null),
+        profile_gender: cleanText(body.answers?.profileGender, null),
         answers: body.answers || {},
         reading,
         active_index: reading.activeIndex,
