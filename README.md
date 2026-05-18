@@ -12,6 +12,20 @@ npm run dev
 Frontend: http://127.0.0.1:5176
 Backend: http://127.0.0.1:8787
 
+## Publicar no GitHub Pages
+
+O GitHub Pages deve publicar o app pelo workflow em `.github/workflows/deploy-pages.yml`, que compila o Vite e envia a pasta `dist`.
+
+No GitHub, abra **Settings > Pages** e altere **Build and deployment > Source** para **GitHub Actions**.
+
+Se o backend estiver hospedado fora do GitHub Pages, cadastre a URL publica em **Settings > Secrets and variables > Actions > Variables**:
+
+```bash
+VITE_API_BASE_URL=https://sua-api-publica.com
+```
+
+Sem essa URL, a tela abre, mas login, rascunhos, OpenAI e Supabase via backend nao funcionam no GitHub Pages, porque Pages hospeda apenas arquivos estaticos.
+
 ## Ligar OpenAI
 
 Crie um arquivo `.env` baseado em `.env.example`:

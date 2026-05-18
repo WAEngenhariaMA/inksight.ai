@@ -53,6 +53,8 @@ interface DraftSummary {
 const AUTH_SESSION_KEY = "tattoo-ai-auth-session";
 const CURRENT_DRAFT_ID_KEY = "tattoo-ai-current-draft-id";
 const LOCAL_DRAFT_KEY = "tattoo-ai-draft";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
 
 const readAuthSession = (): AuthSession | null => {
   try {
@@ -161,7 +163,7 @@ export function App() {
     setDraftError("");
 
     try {
-      const response = await fetch("/api/drafts", {
+      const response = await fetch(apiUrl("/api/drafts"), {
         headers: authHeaders(session),
       });
       const payload = (await response.json()) as { drafts?: DraftSummary[]; error?: string; setupRequired?: boolean };
@@ -198,7 +200,7 @@ export function App() {
     try {
       const endpoint =
         authMode === "register" ? "/api/auth/register" : authMode === "recover" ? "/api/auth/recover" : "/api/auth/login";
-      const response = await fetch(endpoint, {
+      const response = await fetch(apiUrl(endpoint), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -255,7 +257,7 @@ export function App() {
     let loadedDraft = draft;
 
     if (!draft.answers || !Object.keys(draft.answers).length) {
-      const response = await fetch(`/api/drafts/${draft.id}`, {
+      const response = await fetch(apiUrl(`/api/drafts/${draft.id}`), {
         headers: authHeaders(session),
       });
       const payload = (await response.json()) as { draft?: DraftSummary; error?: string };
@@ -300,7 +302,7 @@ export function App() {
     localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify(values));
 
     try {
-      const response = await fetch("/api/drafts", {
+      const response = await fetch(apiUrl("/api/drafts"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -346,7 +348,7 @@ export function App() {
     setStatus("Gerando conceito e imagem com OpenAI");
 
     try {
-      const healthResponse = await fetch("/api/health");
+      const healthResponse = await fetch(apiUrl("/api/health"));
       const health = (await healthResponse.json()) as { openai?: boolean };
       if (!health.openai) {
         throw new Error(
@@ -354,7 +356,7 @@ export function App() {
         );
       }
 
-      const response = await fetch("/api/generate-tattoo", {
+      const response = await fetch(apiUrl("/api/generate-tattoo"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers: values, reading: localReading }),
