@@ -12,15 +12,13 @@ permissions:
   id-token: write
 
 concurrency:
-  group: github-pages
+  group: pages
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      GITHUB_PAGES: "true"
-      VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,7 +26,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
           cache: npm
 
       - name: Install dependencies
@@ -36,9 +34,9 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
+        env:
+          GITHUB_PAGES: "true"
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
@@ -48,10 +46,9 @@ jobs:
   deploy:
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
+
     steps:
-      - name: Deploy
-        id: deployment
+      - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4

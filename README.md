@@ -1,6 +1,14 @@
-# Tattoo AI Simbolica
+# Inksight AI
 
 Sistema de formulario simbolico para gerar conceito, prompt tecnico, imagem IA, stencil, mockup e relatorio premium de tatuagem.
+
+## Arquitetura
+
+- Front-end: React/Vite publicado no GitHub Pages.
+- Backend/API: Cloudflare Worker em `worker/index.js`.
+- IA: OpenAI Responses API para texto e OpenAI Images API para imagem.
+- Dados: Supabase Auth, `tattoo_drafts` e `tattoo_generations`.
+- Seguranca: chaves sensiveis ficam somente no Cloudflare Worker.
 
 ## Rodar localmente
 
@@ -9,46 +17,116 @@ npm install
 npm run dev
 ```
 
-Frontend: http://127.0.0.1:5176
-Backend: http://127.0.0.1:8787
+Frontend local: http://127.0.0.1:5176
 
-## Publicar no GitHub Pages
+Backend local legado: http://127.0.0.1:8787
 
-O GitHub Pages deve publicar o app pelo workflow em `.github/workflows/deploy-pages.yml`, que compila o Vite e envia a pasta `dist`.
+## Publicar o Cloudflare Worker
 
-No GitHub, abra **Settings > Pages** e altere **Build and deployment > Source** para **GitHub Actions**.
-
-Se o backend estiver hospedado fora do GitHub Pages, cadastre a URL publica em **Settings > Secrets and variables > Actions > Variables**:
+1. Instale as dependencias:
 
 ```bash
-VITE_API_BASE_URL=https://sua-api-publica.com
+npm install
 ```
 
-Sem essa URL, a tela abre, mas login, rascunhos, OpenAI e Supabase via backend nao funcionam no GitHub Pages, porque Pages hospeda apenas arquivos estaticos.
-
-## Ligar OpenAI
-
-Crie um arquivo `.env` baseado em `.env.example`:
+2. Se necessario, instale Wrangler:
 
 ```bash
-OPENAI_API_KEY=sua_chave
-OPENAI_TEXT_MODEL=gpt-5
-OPENAI_IMAGE_MODEL=gpt-image-1
-OPENAI_IMAGE_SIZE=1024x1536
+npm install -D wrangler
 ```
 
-O navegador chama `/api/generate-tattoo`; o backend chama a OpenAI Responses API para refinar o conceito e a OpenAI Images API para gerar a imagem. A chave fica somente no backend.
-
-## Ligar Supabase
-
-Rode `supabase/schema.sql` no SQL Editor do Supabase e adicione:
+3. Faca login na Cloudflare:
 
 ```bash
-SUPABASE_URL=sua_url
-SUPABASE_ANON_KEY=sua_anon_key
-SUPABASE_SERVICE_ROLE_KEY=
+npx wrangler login
 ```
 
-O login, cadastro e recuperacao de senha usam Supabase Auth. Os rascunhos ficam em `tattoo_drafts` com `user_id`, entao cada conta carrega apenas os proprios projetos.
+4. Cadastre os secrets do Worker:
 
-Quando configurado, cada geracao tambem salva respostas, leitura, prompt, imagem e historico em `tattoo_generations`.
+```bash
+npx wrangler secret put OPENAI_API_KEY
+npx wrangler secret put SUPABASE_URL
+npx wrangler secret put SUPABASE_ANON_KEY
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+```
+
+5. Publique o Worker:
+
+```bash
+npm run worker:deploy
+```
+
+6. Copie a URL gerada, por exemplo:
+
+```text
+https://inksight-api.xxxxx.workers.dev
+```
+
+7. Teste a API:
+
+```bash
+https://inksight-api.xxxxx.workers.dev/api/health
+```
+
+## Configurar GitHub Pages
+
+1. No GitHub, va em **Settings > Pages**.
+2. Em **Build and deployment > Source**, escolha **GitHub Actions**.
+3. Va em **Settings > Secrets and variables > Actions > Variables**.
+4. Crie a variavel:
+
+```bash
+VITE_API_BASE_URL=https://inksight-api.xxxxx.workers.dev
+```
+
+5. Rode novamente o workflow **Deploy GitHub Pages**.
+6. Abra:
+
+```text
+https://waengenhariama.github.io/inksight.ai/
+```
+
+## Supabase
+
+Rode o arquivo `supabase/schema.sql` no SQL Editor do Supabase. Ele cria/atualiza:
+
+- `tattoo_drafts`
+- `tattoo_generations`
+- indices por `user_id`
+- RLS
+- politicas futuras para usuarios autenticados
+
+O Worker usa `SUPABASE_SERVICE_ROLE_KEY` para gravar com seguranca no backend e filtra dados pelo usuario validado no Supabase Auth.
+
+## Variaveis
+
+No GitHub Actions Variables deve existir apenas:
+
+```bash
+VITE_API_BASE_URL=https://URL-DO-WORKER.workers.dev
+```
+
+No Cloudflare Worker Secrets devem existir:
+
+```bash
+OPENAI_API_KEY
+SUPABASE_URL
+SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+```
+
+No `wrangler.toml` ficam somente variaveis nao sensiveis:
+
+```toml
+OPENAI_TEXT_MODEL = "gpt-5"
+OPENAI_IMAGE_MODEL = "gpt-image-1"
+OPENAI_IMAGE_SIZE = "1024x1536"
+```
+
+## Seguranca
+
+- Nunca coloque `OPENAI_API_KEY` no front-end.
+- Nunca coloque `SUPABASE_SERVICE_ROLE_KEY` no front-end.
+- Nunca coloque secrets no `wrangler.toml`.
+- Nunca commite `.env`.
+- Se alguma chave ja foi exposta, revogue e gere uma nova no provedor correspondente.
