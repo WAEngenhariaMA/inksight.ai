@@ -17,6 +17,7 @@ import { ModuleRail } from "./components/ModuleRail";
 import { BrandSigil } from "./components/Ornaments";
 import { PreviewPanel } from "./components/PreviewPanel";
 import { FormValue, formModules } from "./data/formSchema";
+import { ApiError, apiFetch } from "./lib/api";
 import {
   AiGenerationResult,
   createPremiumDeliverables,
@@ -53,8 +54,6 @@ interface DraftSummary {
 const AUTH_SESSION_KEY = "tattoo-ai-auth-session";
 const CURRENT_DRAFT_ID_KEY = "tattoo-ai-current-draft-id";
 const LOCAL_DRAFT_KEY = "tattoo-ai-draft";
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
-const apiUrl = (path: string) => `${API_BASE_URL}${path}`;
 
 const readAuthSession = (): AuthSession | null => {
   try {
@@ -163,22 +162,17 @@ export function App() {
     setDraftError("");
 
     try {
-      const response = await fetch(apiUrl("/api/drafts"), {
+      const payload = await apiFetch<{ drafts?: DraftSummary[]; error?: string; setupRequired?: boolean }>("/api/drafts", {
         headers: authHeaders(session),
       });
-      const payload = (await response.json()) as { drafts?: DraftSummary[]; error?: string; setupRequired?: boolean };
-      if (response.status === 401) {
-        logout();
-        throw new Error(payload.error || "Sessão expirada. Entre novamente.");
-      }
-      if (!response.ok) {
-        throw new Error(payload.error || "Não foi possível carregar os rascunhos.");
-      }
       if (payload.setupRequired && payload.error) {
         setDraftError(payload.error);
       }
       setDrafts(payload.drafts ?? []);
     } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        logout();
+      }
       setDraftError(error instanceof Error ? error.message : "Erro ao carregar rascunhos.");
     } finally {
       setDraftLoading(false);
@@ -200,26 +194,20 @@ export function App() {
     try {
       const endpoint =
         authMode === "register" ? "/api/auth/register" : authMode === "recover" ? "/api/auth/recover" : "/api/auth/login";
-      const response = await fetch(apiUrl(endpoint), {
+      const payload = await apiFetch<{
+        accessToken?: string;
+        error?: string;
+        message?: string;
+        needsConfirmation?: boolean;
+        user?: AuthSession["user"];
+      }>(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: authEmail,
           name: authName,
           password: authPassword,
         }),
       });
-      const payload = (await response.json()) as {
-        accessToken?: string;
-        error?: string;
-        message?: string;
-        needsConfirmation?: boolean;
-        user?: AuthSession["user"];
-      };
-
-      if (!response.ok) {
-        throw new Error(payload.error || "Não foi possível concluir o acesso.");
-      }
 
       if (payload.accessToken && payload.user) {
         applySession({ accessToken: payload.accessToken, user: payload.user });
@@ -230,13 +218,13 @@ export function App() {
         payload.message ||
           (payload.needsConfirmation
             ? "Cadastro criado. Confirme seu e-mail antes de entrar."
-            : "Solicitação enviada."),
+            : "Solicitacao enviada."),
       );
       if (authMode === "register") {
         setAuthMode("login");
       }
     } catch (error) {
-      setAuthError(error instanceof Error ? error.message : "Erro de autenticação.");
+      setAuthError(error instanceof Error ? error.message : "Erro de autenticacao.");
     } finally {
       setAuthLoading(false);
     }
@@ -257,12 +245,11 @@ export function App() {
     let loadedDraft = draft;
 
     if (!draft.answers || !Object.keys(draft.answers).length) {
-      const response = await fetch(apiUrl(`/api/drafts/${draft.id}`), {
+      const payload = await apiFetch<{ draft?: DraftSummary; error?: string }>(`/api/drafts/${draft.id}`, {
         headers: authHeaders(session),
       });
-      const payload = (await response.json()) as { draft?: DraftSummary; error?: string };
-      if (!response.ok || !payload.draft) {
-        setDraftError(payload.error || "Não foi possível abrir o rascunho.");
+      if (!payload.draft) {
+        setDraftError(payload.error || "Nao foi possivel abrir o rascunho.");
         return;
       }
       loadedDraft = payload.draft;
@@ -302,25 +289,22 @@ export function App() {
     localStorage.setItem(LOCAL_DRAFT_KEY, JSON.stringify(values));
 
     try {
-      const response = await fetch(apiUrl("/api/drafts"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...authHeaders(session),
-        },
+      const path = currentDraftId ? `/api/drafts/${currentDraftId}` : "/api/drafts";
+      const method = currentDraftId ? "PUT" : "POST";
+      const payload = await apiFetch<{ draft?: DraftSummary; error?: string }>(path, {
+        method,
+        headers: authHeaders(session),
         body: JSON.stringify({
           activeIndex,
           answers: values,
           completion: reading.completion,
-          draftId: currentDraftId,
           reading,
           title: buildDraftTitle(values, reading),
         }),
       });
-      const payload = (await response.json()) as { draft?: DraftSummary; error?: string };
 
-      if (!response.ok || !payload.draft) {
-        throw new Error(payload.error || "Não foi possível salvar o rascunho.");
+      if (!payload.draft) {
+        throw new Error(payload.error || "Nao foi possivel salvar o rascunho.");
       }
 
       setCurrentDraftId(payload.draft.id);
@@ -348,33 +332,27 @@ export function App() {
     setStatus("Gerando conceito e imagem com OpenAI");
 
     try {
-      const healthResponse = await fetch(apiUrl("/api/health"));
-      const health = (await healthResponse.json()) as { openai?: boolean };
+      const health = await apiFetch<{ openai?: boolean }>("/api/health");
       if (!health.openai) {
         throw new Error(
-          "A IA está conectada, mas falta configurar a chave OPENAI_API_KEY no backend. Crie o arquivo .env com sua chave e reinicie o servidor.",
+          "A IA esta conectada, mas falta configurar a chave OPENAI_API_KEY no backend.",
         );
       }
 
-      const response = await fetch(apiUrl("/api/generate-tattoo"), {
+      const payload = await apiFetch<AiGenerationResult & { error?: string; ok?: boolean }>("/api/generate-tattoo", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers: values, reading: localReading }),
+        headers: authHeaders(session),
+        body: JSON.stringify({ answers: values, reading: localReading, userId: session?.user.id }),
       });
-      const payload = (await response.json()) as AiGenerationResult & { error?: string };
-
-      if (!response.ok) {
-        throw new Error(payload.error || "Não foi possível gerar a tattoo.");
-      }
 
       setAiResult(payload);
       setActiveDeliverable("image");
       setPackageGenerated(true);
-      setStatus(payload.history?.saved ? "Imagem IA gerada e histórico salvo" : "Imagem IA gerada");
+      setStatus(payload.history?.saved ? "Imagem IA gerada e historico salvo" : "Imagem IA gerada");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro desconhecido ao gerar imagem.";
       setGenerationError(message);
-      setStatus("Geração pausada");
+      setStatus("Geracao pausada");
     } finally {
       setGenerating(false);
     }
