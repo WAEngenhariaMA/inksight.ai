@@ -28,7 +28,8 @@ const elementIcons = {
 
 const renderOptionLabel = (field: FormField, option: FieldOption) => {
   const Icon =
-    field.id === "element" ? elementIcons[option.label as keyof typeof elementIcons] : undefined;
+    option.icon ??
+    (field.id === "element" ? elementIcons[option.label as keyof typeof elementIcons] : undefined);
 
   return (
     <>

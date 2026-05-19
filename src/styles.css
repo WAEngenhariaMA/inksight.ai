@@ -815,9 +815,8 @@ textarea::placeholder {
 }
 
 .choice-grid--multi {
-  max-height: 250px;
-  overflow-x: hidden;
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
   padding-right: 3px;
 }
 
@@ -841,6 +840,14 @@ textarea::placeholder {
 .choice-icon {
   flex: 0 0 auto;
   color: var(--gold);
+}
+
+.choice--gold .choice-icon {
+  color: var(--gold);
+}
+
+.choice--shadow .choice-icon {
+  color: #a9a195;
 }
 
 .choice--fire .choice-icon {

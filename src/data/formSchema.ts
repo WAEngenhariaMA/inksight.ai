@@ -1,13 +1,30 @@
 import {
   Brain,
   Brush,
+  Castle,
+  Circle,
+  CircleDot,
+  CircuitBoard,
+  Clapperboard,
   Compass,
+  Cog,
   Dna,
+  Eye,
   Flame,
+  Flower2,
+  Gem,
+  Landmark,
+  Moon,
   Orbit,
+  Palette,
+  PenLine,
   Shield,
   Sparkles,
+  Square,
+  Triangle,
+  WandSparkles,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 export type FieldType = "text" | "date" | "time" | "single" | "multi" | "select" | "textarea";
 
@@ -15,6 +32,7 @@ export type FormValue = string | string[];
 
 export interface FieldOption {
   label: string;
+  icon?: LucideIcon;
   tone?: "fire" | "water" | "earth" | "air" | "shadow" | "gold" | "teal" | "violet";
   description?: string;
 }
@@ -37,7 +55,7 @@ export interface FormModule {
   shortTitle: string;
   railSubtitle: string;
   subtitle: string;
-  icon: typeof Sparkles;
+  icon: LucideIcon;
   fields: FormField[];
 }
 
@@ -379,27 +397,127 @@ export const formModules: FormModule[] = [
         label: "Qual estilo visual você prefere?",
         type: "multi",
         options: [
-          "Dark",
-          "Fine line",
-          "Blackwork",
-          "Realista",
-          "Geométrico",
-          "Minimalista",
-          "Místico",
-          "Tribal",
-          "Viking",
-          "Japonês",
-          "Medieval",
-          "Cyber sigilism",
-          "Gótico",
-          "Surrealista",
-          "Cinematográfico",
-          "Ornamental",
-          "Dotwork",
-          "Sketch",
-          "Biomecânico",
-          "Neo-traditional",
-        ].map((label) => ({ label })),
+          {
+            label: "Dark",
+            icon: Moon,
+            tone: "shadow",
+            description: "Sombrio, intenso e contrastado. Ideal para mistério, poder oculto e presença emocional forte.",
+          },
+          {
+            label: "Fine line",
+            icon: PenLine,
+            tone: "gold",
+            description: "Traços finos e elegantes. Funciona bem para detalhes delicados, símbolos sutis e composições leves.",
+          },
+          {
+            label: "Blackwork",
+            icon: Square,
+            tone: "shadow",
+            description: "Preto sólido, alto impacto e leitura gráfica. Excelente para força visual, sigilos e contraste.",
+          },
+          {
+            label: "Realista",
+            icon: Eye,
+            tone: "teal",
+            description: "Luz, sombra e volume próximos do real. Indicado para animais, rostos, objetos e cenas com profundidade.",
+          },
+          {
+            label: "Geométrico",
+            icon: Triangle,
+            tone: "earth",
+            description: "Simetria, proporção e padrões matemáticos. Traz ordem, equilíbrio e sensação ritualística.",
+          },
+          {
+            label: "Minimalista",
+            icon: Circle,
+            tone: "air",
+            description: "Poucos elementos, linhas limpas e significado direto. Ótimo quando a tatuagem precisa ser discreta.",
+          },
+          {
+            label: "Místico",
+            icon: Sparkles,
+            tone: "violet",
+            description: "Astros, magia, espiritualidade e símbolos esotéricos. Cria uma leitura mais energética e espiritual.",
+          },
+          {
+            label: "Tribal",
+            icon: Flame,
+            tone: "earth",
+            description: "Linhas ancestrais, padrões orgânicos e energia ritual. Valoriza identidade, origem e proteção.",
+          },
+          {
+            label: "Viking",
+            icon: Shield,
+            tone: "gold",
+            description: "Runas, nós nórdicos, escudos e atmosfera guerreira. Passa coragem, destino e resistência.",
+          },
+          {
+            label: "Japonês",
+            icon: Flower2,
+            tone: "fire",
+            description: "Composição fluida, tradicional e narrativa. Combina ondas, flores, dragões, máscaras e movimento corporal.",
+          },
+          {
+            label: "Medieval",
+            icon: Castle,
+            tone: "earth",
+            description: "Brasões, espadas, armaduras e castelos. Traz honra, guerra interna, legado e atmosfera antiga.",
+          },
+          {
+            label: "Cyber sigilism",
+            icon: CircuitBoard,
+            tone: "teal",
+            description: "Sigilos futuristas, linhas afiadas e linguagem digital. Une tecnologia, ritual e identidade moderna.",
+          },
+          {
+            label: "Gótico",
+            icon: Landmark,
+            tone: "shadow",
+            description: "Arquitetura sombria, drama, cruzes, ornamentos e melancolia elegante. Ideal para uma presença intensa.",
+          },
+          {
+            label: "Surrealista",
+            icon: WandSparkles,
+            tone: "violet",
+            description: "Mistura sonho e realidade com imagens impossíveis. Ótimo para alma oculta, caos e transformação.",
+          },
+          {
+            label: "Cinematográfico",
+            icon: Clapperboard,
+            tone: "gold",
+            description: "Cena épica, luz dramática, profundidade e narrativa. Faz a tattoo parecer um frame de filme.",
+          },
+          {
+            label: "Ornamental",
+            icon: Gem,
+            tone: "gold",
+            description: "Arabescos, joalheria visual e detalhes decorativos. Entrega elegância, simetria e acabamento premium.",
+          },
+          {
+            label: "Dotwork",
+            icon: CircleDot,
+            tone: "earth",
+            description: "Sombras e texturas feitas por pontos. Cria profundidade suave, mandalas e efeitos espirituais refinados.",
+          },
+          {
+            label: "Sketch",
+            icon: Brush,
+            tone: "air",
+            description: "Aparência de desenho, rascunho e gesto artístico. Passa movimento, espontaneidade e expressão.",
+          },
+          {
+            label: "Biomecânico",
+            icon: Cog,
+            tone: "teal",
+            description: "Fusão de corpo, máquina, músculos e metal. Traz ficção científica, anatomia e impacto agressivo.",
+          },
+          {
+            label: "Neo-traditional",
+            icon: Palette,
+            tone: "fire",
+            description: "Tradicional moderno com contornos fortes, contraste e ilustração expressiva. Une impacto clássico e leitura atual.",
+          },
+        ],
       },
       {
         id: "detailLevel",
