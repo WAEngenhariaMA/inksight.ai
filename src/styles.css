@@ -1115,7 +1115,7 @@ textarea::placeholder {
     rgba(5, 6, 6, 0.58);
 }
 
-.live-summary strong {
+.live-summary > strong {
   display: block;
   color: var(--gold);
   font-size: 12px;
@@ -1131,19 +1131,57 @@ textarea::placeholder {
   line-height: 1.5;
 }
 
-.live-summary div {
+.live-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.live-summary span {
+.live-tags span {
   border: 1px solid rgba(201, 166, 106, 0.22);
   background: rgba(201, 166, 106, 0.06);
   color: var(--gold-dim);
   padding: 5px 7px;
   font-family: Inter, system-ui, sans-serif;
   font-size: 11px;
+}
+
+.live-meaning-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 13px;
+}
+
+.live-meaning-list article {
+  padding: 9px 10px;
+  border: 1px solid rgba(201, 166, 106, 0.16);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.live-meaning-list article > span {
+  display: block;
+  color: var(--gold-dim);
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+
+.live-meaning-list strong {
+  display: block;
+  margin-top: 3px;
+  color: #f3e3c8;
+  font-size: 12px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+
+.live-meaning-list p {
+  margin: 5px 0 0;
+  color: #b9ae9d;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .synthesis-list article {
