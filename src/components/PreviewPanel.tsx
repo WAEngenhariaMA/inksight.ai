@@ -282,8 +282,8 @@ export function PreviewPanel({
               </button>
             </div>
           </div>
-          {activeDeliverable === "report" ? (
-            <PremiumReportCard imageUrl={aiResult?.imageUrl || ORACLE_ARTWORK_URL} reading={reading} />
+          {activeDeliverable === "report" || aiResult?.imageUrl ? (
+            <PremiumReportCard answers={answers} imageUrl={aiResult?.imageUrl || ORACLE_ARTWORK_URL} reading={reading} />
           ) : (
             <pre>{deliverable.content}</pre>
           )}
@@ -295,41 +295,96 @@ export function PreviewPanel({
 }
 
 function PremiumReportCard({
+  answers,
   imageUrl,
   reading,
 }: {
+  answers: FormState;
   imageUrl?: string;
   reading: SymbolicReading;
 }) {
+  const identityName = asText(answers.identityName) || "Sua essência";
+  const displayName = identityName.split(" ")[0] || identityName;
+  const birthDate = formatDateBR(asText(answers.birthDate));
+  const ascendant = asText(answers.ascendant) || "Em leitura";
+  const element = asText(answers.element) || "Em leitura";
+  const energy = [
+    ...asList(answers.traits).slice(0, 3),
+    ...asList(answers.perceivedEnergy).slice(0, 2),
+  ].slice(0, 4);
+  const shadows = [
+    ...asList(answers.shadowToTransform).slice(0, 3),
+    asText(answers.fear),
+    ...asList(answers.emotionToHeal).slice(0, 2),
+  ].filter(Boolean);
+  const essence = [
+    ...asList(answers.eternalize).slice(0, 2),
+    asText(answers.lifePhase),
+    asText(answers.drive),
+  ].filter(Boolean);
+  const reportElements = buildReportElements(answers, reading);
+
   return (
     <article className="premium-report-card">
       <div className="premium-report-card__media">
         {imageUrl ? <img src={imageUrl} alt={`Relatório visual de ${reading.tattooName}`} /> : <OracleEye />}
       </div>
       <div className="premium-report-card__content">
-        <span>Relatório premium</span>
-        <h3>{reading.tattooName}</h3>
-        <dl>
+        <header className="premium-report-identity">
+          <span>Sua essência</span>
+          <h3>{displayName}</h3>
+          <strong>{reading.dominantArchetype}</strong>
+        </header>
+        <dl className="premium-report-meta">
           <div>
-            <dt>Arquétipo</dt>
-            <dd>{reading.dominantArchetype}</dd>
+            <dt>Data</dt>
+            <dd>{birthDate}</dd>
           </div>
           <div>
-            <dt>Estilo ideal</dt>
-            <dd>{reading.idealStyle}</dd>
+            <dt>Ascendente</dt>
+            <dd>{ascendant}</dd>
           </div>
           <div>
-            <dt>Composição</dt>
-            <dd>{reading.bodyComposition}</dd>
+            <dt>Elemento</dt>
+            <dd>{element}</dd>
+          </div>
+          <div>
+            <dt>Energia</dt>
+            <dd>{energy.length ? joinNatural(energy) : "Em leitura"}</dd>
           </div>
         </dl>
-        <p>{reading.cinematicConcept}</p>
-        <p>{reading.hiddenMeaning}</p>
-        <div className="premium-report-card__symbols">
-          {reading.symbolExplanations.slice(0, 4).map((symbol) => (
-            <span key={symbol}>{symbol}</span>
-          ))}
-        </div>
+
+        <section className="premium-report-section">
+          <h4>Significado da tattoo</h4>
+          <p>{reading.hiddenMeaning}</p>
+          <p>{reading.cinematicConcept}</p>
+        </section>
+
+        <section className="premium-report-section">
+          <h4>Elementos principais</h4>
+          <div className="premium-symbol-list">
+            {reportElements.map((item) => (
+              <article key={`${item.title}-${item.description}`}>
+                <span aria-hidden="true">{initials(item.title)}</span>
+                <div>
+                  <strong>{item.title}</strong>
+                  <p>{item.description}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="premium-report-mini-grid">
+          <div>
+            <h4>Sombras a transformar</h4>
+            <p>{shadows.length ? joinNatural(shadows) : "Bloqueios internos, medo e padrões antigos em processo de domínio."}</p>
+          </div>
+          <div>
+            <h4>Essência da tattoo</h4>
+            <p>{essence.length ? joinNatural(essence) : "Evolução pessoal, proteção e controle interno."}</p>
+          </div>
+        </section>
       </div>
     </article>
   );
@@ -337,6 +392,60 @@ function PremiumReportCard({
 
 const asText = (value: FormState[string]) => (typeof value === "string" ? value : "");
 const asList = (value: FormState[string]) => (Array.isArray(value) ? value : []);
+
+const formatDateBR = (value: string) => {
+  if (!value) return "Em leitura";
+  const [year, month, day] = value.split("-");
+  return year && month && day ? `${day}/${month}/${year}` : value;
+};
+
+const initials = (value: string) =>
+  value
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+
+const sentenceFromSymbol = (value: string) => {
+  const [title, description] = value.split(/:\s*/);
+  return {
+    title: title?.trim() || value,
+    description: description?.trim() || meaningFor(value, "Símbolo"),
+  };
+};
+
+const buildReportElements = (answers: FormState, reading: SymbolicReading) => {
+  const candidates = [
+    {
+      title: reading.dominantArchetype,
+      description: meaningFor(reading.dominantArchetype, "Arquétipo"),
+    },
+    ...valuesForField(answers, "soulEnvironment").slice(0, 1).map((value) => ({
+      title: value,
+      description: meaningFor(value, "Ambiente"),
+    })),
+    ...valuesForField(answers, "animals").slice(0, 2).map((value) => ({
+      title: value,
+      description: meaningFor(value, "Animal"),
+    })),
+    ...valuesForField(answers, "sacredSymbols").slice(0, 3).map((value) => ({
+      title: value,
+      description: meaningFor(value, "Símbolo"),
+    })),
+    ...reading.symbolExplanations.slice(0, 4).map(sentenceFromSymbol),
+  ];
+
+  const unique = new Map<string, { title: string; description: string }>();
+  candidates.forEach((item) => {
+    if (item.title && item.title !== "Em leitura" && !unique.has(item.title)) {
+      unique.set(item.title, item);
+    }
+  });
+
+  return Array.from(unique.values()).slice(0, 7);
+};
 
 type MeaningItem = {
   field: string;
