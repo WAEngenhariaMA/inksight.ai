@@ -524,6 +524,27 @@ button:disabled {
 .generation-history-list {
   display: grid;
   gap: 10px;
+  max-height: clamp(230px, 38vh, 430px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 8px;
+  scrollbar-color: rgba(201, 166, 106, 0.58) rgba(201, 166, 106, 0.08);
+  scrollbar-width: thin;
+}
+
+.generation-history-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.generation-history-list::-webkit-scrollbar-track {
+  background: rgba(201, 166, 106, 0.08);
+}
+
+.generation-history-list::-webkit-scrollbar-thumb {
+  border: 2px solid rgba(6, 7, 7, 0.92);
+  border-radius: 999px;
+  background: rgba(201, 166, 106, 0.58);
 }
 
 .generation-history-card {
