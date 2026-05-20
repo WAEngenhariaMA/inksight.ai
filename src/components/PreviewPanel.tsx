@@ -1,10 +1,13 @@
 import {
+  AlertCircle,
   Clipboard,
+  Coins,
   Download,
   FileText,
   Image,
   Layers3,
   PenTool,
+  ShoppingCart,
   Sparkles,
   Wand2,
 } from "lucide-react";
@@ -19,6 +22,17 @@ import { formModules } from "../data/formSchema";
 import { DecorativeRule, OracleEye } from "./Ornaments";
 import { ORACLE_ARTWORK_URL } from "../config/visualAssets";
 
+type GenerationAction = "concept" | "image" | "mockup" | "stencil" | "fullPackage";
+
+interface CreditCosts {
+  concept: number;
+  tattooImage: number;
+  mockup: number;
+  stencil: number;
+  report: number;
+  fullPackage: number;
+}
+
 interface PreviewPanelProps {
   answers: FormState;
   activeDeliverable: DeliverableKey;
@@ -27,12 +41,21 @@ interface PreviewPanelProps {
   packageGenerated: boolean;
   copied: boolean;
   generating: boolean;
+  generationAction: GenerationAction | null;
   generationError: string;
   aiResult: AiGenerationResult | null;
+  creditBalance: number | null;
+  creditCosts: CreditCosts;
+  creditLoading: boolean;
+  onBuyCredits: () => void;
   onCopyPrompt: () => void;
   onCopyDeliverable: () => void;
   onDownloadDeliverable: () => void;
-  onGenerate: () => void;
+  onGenerateConcept: () => void;
+  onGenerateFullPackage: () => void;
+  onGenerateImage: () => void;
+  onGenerateMockup: () => void;
+  onGenerateStencil: () => void;
   onSelectDeliverable: (key: DeliverableKey) => void;
 }
 
@@ -44,12 +67,21 @@ export function PreviewPanel({
   packageGenerated,
   copied,
   generating,
+  generationAction,
   generationError,
   aiResult,
+  creditBalance,
+  creditCosts,
+  creditLoading,
+  onBuyCredits,
   onCopyPrompt,
   onCopyDeliverable,
   onDownloadDeliverable,
-  onGenerate,
+  onGenerateConcept,
+  onGenerateFullPackage,
+  onGenerateImage,
+  onGenerateMockup,
+  onGenerateStencil,
   onSelectDeliverable,
 }: PreviewPanelProps) {
   const deliveryItems = [
@@ -68,6 +100,45 @@ export function PreviewPanel({
   ];
 
   const liveAspects = buildLiveAspects(answers, reading);
+  const previewImageUrl =
+    activeDeliverable === "mockup"
+      ? aiResult?.mockupUrl || aiResult?.imageUrl
+      : activeDeliverable === "stencil"
+        ? aiResult?.stencilUrl || aiResult?.imageUrl
+        : aiResult?.imageUrl;
+  const canSpend = (cost: number) => creditBalance === null || creditBalance >= cost;
+  const actionButtons = [
+    {
+      key: "concept" as const,
+      label: "Gerar conceito",
+      cost: creditCosts.concept,
+      onClick: onGenerateConcept,
+    },
+    {
+      key: "image" as const,
+      label: "Gerar imagem com IA",
+      cost: creditCosts.tattooImage,
+      onClick: onGenerateImage,
+    },
+    {
+      key: "mockup" as const,
+      label: "Gerar mockup",
+      cost: creditCosts.mockup,
+      onClick: onGenerateMockup,
+    },
+    {
+      key: "stencil" as const,
+      label: "Gerar stencil",
+      cost: creditCosts.stencil,
+      onClick: onGenerateStencil,
+    },
+    {
+      key: "fullPackage" as const,
+      label: "Gerar pacote completo",
+      cost: creditCosts.fullPackage,
+      onClick: onGenerateFullPackage,
+    },
+  ];
 
   return (
     <aside className="preview-panel">
@@ -77,8 +148,8 @@ export function PreviewPanel({
       </header>
 
       <div className="oracle-stage">
-        {aiResult?.imageUrl ? (
-          <img src={aiResult.imageUrl} alt={`Imagem gerada para ${reading.tattooName}`} />
+        {previewImageUrl ? (
+          <img src={previewImageUrl} alt={`Imagem gerada para ${reading.tattooName}`} />
         ) : ORACLE_ARTWORK_URL ? (
           <img src={ORACLE_ARTWORK_URL} alt="Arte simbólica do oráculo" />
         ) : (
@@ -150,16 +221,44 @@ export function PreviewPanel({
           {reading.completion}%
         </div>
         <p>
-          {aiResult?.imageUrl
-            ? "Imagem gerada e pacote premium pronto."
+          {previewImageUrl
+            ? "Imagem gerada e pacote premium em construção."
             : "Complete os módulos para liberar todas as gerações."}
         </p>
       </div>
 
-      <button className="button button--primary button--wide" disabled={generating} onClick={onGenerate} type="button">
-        <Wand2 size={18} />
-        {generating ? "Gerando com OpenAI..." : "Gerar imagem com IA"}
-      </button>
+      <section className="credit-wallet">
+        <div>
+          <span>Saldo disponível</span>
+          <strong>{creditLoading ? "Carregando..." : `${creditBalance ?? 0} créditos`}</strong>
+        </div>
+        <button className="button button--ghost" onClick={onBuyCredits} type="button">
+          <ShoppingCart size={16} />
+          Comprar créditos
+        </button>
+      </section>
+
+      <section className="generation-actions" aria-label="Ações premium com créditos">
+        {actionButtons.map((action) => {
+          const insufficient = !canSpend(action.cost);
+          const running = generationAction === action.key && generating;
+          return (
+            <button
+              className={`generation-action ${insufficient ? "generation-action--locked" : ""}`}
+              disabled={generating && !running}
+              key={action.key}
+              onClick={insufficient ? onBuyCredits : action.onClick}
+              type="button"
+            >
+              <span>
+                {running ? <Wand2 size={16} /> : insufficient ? <AlertCircle size={16} /> : <Coins size={16} />}
+                {running ? "Gerando..." : action.label}
+              </span>
+              <strong>{action.cost} cr</strong>
+            </button>
+          );
+        })}
+      </section>
 
       {generationError ? <div className="generation-error">{generationError}</div> : null}
 
@@ -183,11 +282,56 @@ export function PreviewPanel({
               </button>
             </div>
           </div>
-          <pre>{deliverable.content}</pre>
+          {activeDeliverable === "report" ? (
+            <PremiumReportCard imageUrl={aiResult?.imageUrl || ORACLE_ARTWORK_URL} reading={reading} />
+          ) : (
+            <pre>{deliverable.content}</pre>
+          )}
           {copied ? <span className="copy-status">Copiado</span> : null}
         </section>
       ) : null}
     </aside>
+  );
+}
+
+function PremiumReportCard({
+  imageUrl,
+  reading,
+}: {
+  imageUrl?: string;
+  reading: SymbolicReading;
+}) {
+  return (
+    <article className="premium-report-card">
+      <div className="premium-report-card__media">
+        {imageUrl ? <img src={imageUrl} alt={`Relatório visual de ${reading.tattooName}`} /> : <OracleEye />}
+      </div>
+      <div className="premium-report-card__content">
+        <span>Relatório premium</span>
+        <h3>{reading.tattooName}</h3>
+        <dl>
+          <div>
+            <dt>Arquétipo</dt>
+            <dd>{reading.dominantArchetype}</dd>
+          </div>
+          <div>
+            <dt>Estilo ideal</dt>
+            <dd>{reading.idealStyle}</dd>
+          </div>
+          <div>
+            <dt>Composição</dt>
+            <dd>{reading.bodyComposition}</dd>
+          </div>
+        </dl>
+        <p>{reading.cinematicConcept}</p>
+        <p>{reading.hiddenMeaning}</p>
+        <div className="premium-report-card__symbols">
+          {reading.symbolExplanations.slice(0, 4).map((symbol) => (
+            <span key={symbol}>{symbol}</span>
+          ))}
+        </div>
+      </div>
+    </article>
   );
 }
 

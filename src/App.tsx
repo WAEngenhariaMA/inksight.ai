@@ -1,7 +1,9 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
+  Coins,
   FolderOpen,
+  History,
   HelpCircle,
   KeyRound,
   LogIn,
@@ -51,9 +53,89 @@ interface DraftSummary {
   updatedAt: string;
 }
 
+type GenerationAction = "concept" | "image" | "mockup" | "stencil" | "fullPackage";
+
+interface CreditCosts {
+  concept: number;
+  tattooImage: number;
+  mockup: number;
+  stencil: number;
+  report: number;
+  fullPackage: number;
+}
+
+interface GenerationSummary {
+  id: string;
+  status: string;
+  generationType: string;
+  tattooName?: string;
+  archetype?: string | null;
+  style?: string | null;
+  imageUrl?: string | null;
+  mockupUrl?: string | null;
+  stencilUrl?: string | null;
+  provider?: string | null;
+  model?: string | null;
+  creditsUsed?: number;
+  createdAt: string;
+}
+
 const AUTH_SESSION_KEY = "tattoo-ai-auth-session";
 const CURRENT_DRAFT_ID_KEY = "tattoo-ai-current-draft-id";
 const LOCAL_DRAFT_KEY = "tattoo-ai-draft";
+const DEFAULT_CREDIT_COSTS: CreditCosts = {
+  concept: 1,
+  tattooImage: 5,
+  mockup: 5,
+  stencil: 4,
+  report: 2,
+  fullPackage: 12,
+};
+
+const generationActionConfig: Record<
+  GenerationAction,
+  {
+    endpoint: string;
+    deliverable: DeliverableKey;
+    loading: string;
+    success: string;
+    promptKind?: "image" | "mockup" | "stencil";
+  }
+> = {
+  concept: {
+    endpoint: "/api/generate-concept",
+    deliverable: "report",
+    loading: "Gerando conceito premium com IA",
+    success: "Conceito premium gerado e salvo no histórico",
+  },
+  image: {
+    endpoint: "/api/generate-tattoo-image",
+    deliverable: "image",
+    loading: "Gerando sua tattoo simbólica com IA. Isso pode levar alguns segundos.",
+    success: "Imagem principal gerada e salva no histórico",
+    promptKind: "image",
+  },
+  mockup: {
+    endpoint: "/api/generate-mockup",
+    deliverable: "mockup",
+    loading: "Gerando mockup corporal realista",
+    success: "Mockup corporal gerado e salvo no histórico",
+    promptKind: "mockup",
+  },
+  stencil: {
+    endpoint: "/api/generate-stencil",
+    deliverable: "stencil",
+    loading: "Gerando stencil tattoo-ready",
+    success: "Stencil gerado e salvo no histórico",
+    promptKind: "stencil",
+  },
+  fullPackage: {
+    endpoint: "/api/generate-tattoo",
+    deliverable: "image",
+    loading: "Gerando pacote completo premium",
+    success: "Pacote completo gerado e salvo no histórico",
+  },
+};
 
 const readAuthSession = (): AuthSession | null => {
   try {
@@ -87,8 +169,38 @@ const formatDraftDate = (value: string) =>
     month: "2-digit",
   }).format(new Date(value));
 
+const formatGenerationDate = (value: string) =>
+  new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "2-digit",
+  }).format(new Date(value));
+
 const authHeaders = (session: AuthSession | null): Record<string, string> =>
   session ? { Authorization: `Bearer ${session.accessToken}` } : {};
+
+const mergeGenerationResult = (
+  current: AiGenerationResult | null,
+  next: AiGenerationResult,
+): AiGenerationResult => ({
+  ...current,
+  ...next,
+  imageUrl: next.imageUrl || current?.imageUrl,
+  mockupUrl: next.mockupUrl || current?.mockupUrl,
+  stencilUrl: next.stencilUrl || current?.stencilUrl,
+  imagePrompt: next.imagePrompt || current?.imagePrompt,
+  mockupPrompt: next.mockupPrompt || current?.mockupPrompt,
+  stencilPrompt: next.stencilPrompt || current?.stencilPrompt,
+  reading: {
+    ...(current?.reading || {}),
+    ...(next.reading || {}),
+  },
+  models: {
+    ...(current?.models || {}),
+    ...(next.models || {}),
+  },
+});
 
 export function App() {
   const [session, setSession] = useState<AuthSession | null>(readAuthSession);
@@ -112,8 +224,14 @@ export function App() {
   const [activeDeliverable, setActiveDeliverable] = useState<DeliverableKey>("image");
   const [status, setStatus] = useState("Sistema pronto");
   const [generating, setGenerating] = useState(false);
+  const [generationAction, setGenerationAction] = useState<GenerationAction | null>(null);
   const [generationError, setGenerationError] = useState("");
   const [aiResult, setAiResult] = useState<AiGenerationResult | null>(null);
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
+  const [creditCosts, setCreditCosts] = useState<CreditCosts>(DEFAULT_CREDIT_COSTS);
+  const [creditLoading, setCreditLoading] = useState(false);
+  const [generations, setGenerations] = useState<GenerationSummary[]>([]);
+  const [generationsLoading, setGenerationsLoading] = useState(false);
 
   const activeModule = formModules[activeIndex];
   const localReading = useMemo(() => createSymbolicReading(values), [values]);
@@ -146,6 +264,8 @@ export function App() {
     resetProjectState();
     setSession(null);
     setDrafts([]);
+    setGenerations([]);
+    setCreditBalance(null);
     setDraftError("");
     setAuthPassword("");
     setStatus("Sessão encerrada");
@@ -179,11 +299,67 @@ export function App() {
     }
   }, [session]);
 
+  const refreshCredits = useCallback(async () => {
+    if (!session) {
+      setCreditBalance(null);
+      return;
+    }
+
+    setCreditLoading(true);
+
+    try {
+      const payload = await apiFetch<{ balance?: number; costs?: Partial<CreditCosts> }>("/api/credits/balance", {
+        headers: authHeaders(session),
+      });
+      setCreditBalance(typeof payload.balance === "number" ? payload.balance : 0);
+      setCreditCosts({ ...DEFAULT_CREDIT_COSTS, ...(payload.costs || {}) });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        logout();
+      } else {
+        setCreditBalance(null);
+      }
+    } finally {
+      setCreditLoading(false);
+    }
+  }, [session]);
+
+  const refreshGenerations = useCallback(async () => {
+    if (!session) {
+      setGenerations([]);
+      return;
+    }
+
+    setGenerationsLoading(true);
+
+    try {
+      const payload = await apiFetch<{ generations?: GenerationSummary[] }>("/api/generations", {
+        headers: authHeaders(session),
+      });
+      setGenerations(payload.generations ?? []);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        logout();
+      } else {
+        setGenerations([]);
+      }
+    } finally {
+      setGenerationsLoading(false);
+    }
+  }, [session]);
+
   useEffect(() => {
     if (session && view === "start") {
       void refreshDrafts();
     }
   }, [refreshDrafts, session, view]);
+
+  useEffect(() => {
+    if (session) {
+      void refreshCredits();
+      void refreshGenerations();
+    }
+  }, [refreshCredits, refreshGenerations, session]);
 
   const submitAuth = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -326,36 +502,83 @@ export function App() {
     setTimeout(() => setCopied(false), 1800);
   };
 
-  const generateConcept = async () => {
+  const promptForAction = (action: GenerationAction) => {
+    if (action === "mockup") {
+      return aiResult?.mockupPrompt || aiResult?.reading?.mockupPrompt || "";
+    }
+    if (action === "stencil") {
+      return aiResult?.stencilPrompt || aiResult?.reading?.stencilPrompt || "";
+    }
+    if (action === "image") {
+      return aiResult?.imagePrompt || reading.professionalPrompt;
+    }
+    return "";
+  };
+
+  const runGeneration = async (action: GenerationAction) => {
+    if (!session) {
+      setView("auth");
+      return;
+    }
+
+    const config = generationActionConfig[action];
     setGenerating(true);
+    setGenerationAction(action);
     setGenerationError("");
-    setStatus("Gerando conceito e imagem com OpenAI");
+    setStatus(config.loading);
 
     try {
-      const health = await apiFetch<{ openai?: boolean }>("/api/health");
-      if (!health.openai) {
+      const health = await apiFetch<{
+        openai?: boolean;
+        openaiConfigured?: boolean;
+        supabaseConfigured?: boolean;
+      }>("/api/health");
+      if ((action === "concept" || action === "fullPackage") && !health.openai && !health.openaiConfigured) {
         throw new Error(
           "A IA esta conectada, mas falta configurar a chave OPENAI_API_KEY no backend.",
         );
       }
 
-      const payload = await apiFetch<AiGenerationResult & { error?: string; ok?: boolean }>("/api/generate-tattoo", {
+      const payload = await apiFetch<AiGenerationResult & { error?: string; ok?: boolean }>(config.endpoint, {
         method: "POST",
         headers: authHeaders(session),
-        body: JSON.stringify({ answers: values, reading: localReading, userId: session?.user.id }),
+        body: JSON.stringify({
+          answers: values,
+          reading: action === "concept" || action === "fullPackage" ? localReading : reading,
+          prompt: config.promptKind ? promptForAction(action) : undefined,
+          userId: session.user.id,
+        }),
       });
 
-      setAiResult(payload);
-      setActiveDeliverable("image");
+      setAiResult((current) => mergeGenerationResult(current, payload));
+      setActiveDeliverable(config.deliverable);
       setPackageGenerated(true);
-      setStatus(payload.history?.saved ? "Imagem IA gerada e historico salvo" : "Imagem IA gerada");
+      if (typeof payload.credits?.balance === "number") {
+        setCreditBalance(payload.credits.balance);
+      }
+      setStatus(payload.history?.saved || payload.generation?.id ? config.success : "Geração concluída");
+      await Promise.all([refreshCredits(), refreshGenerations()]);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erro desconhecido ao gerar imagem.";
       setGenerationError(message);
       setStatus("Geracao pausada");
     } finally {
       setGenerating(false);
+      setGenerationAction(null);
     }
+  };
+
+  const generateConcept = () => runGeneration("concept");
+  const generateTattooImage = () => runGeneration("image");
+  const generateMockup = () => runGeneration("mockup");
+  const generateStencil = () => runGeneration("stencil");
+  const generateFullPackage = () => runGeneration("fullPackage");
+
+  const buyCredits = () => {
+    setGenerationError(
+      "Compra de créditos ainda está em preparação. Nesta fase, o administrador pode adicionar créditos pela rota /api/admin/add-credits ou direto no Supabase.",
+    );
+    setStatus("Compra de créditos em preparação");
   };
 
   const selectDeliverable = (key: DeliverableKey) => {
@@ -458,6 +681,10 @@ export function App() {
               </button>
             </>
           ) : null}
+          <span className="credit-chip">
+            <Coins size={15} />
+            {creditLoading ? "Créditos..." : `${creditBalance ?? 0} créditos`}
+          </span>
           <span className="user-chip">{session.user.email}</span>
           <button className="header-link header-link--logout" onClick={logout} type="button">
             <LogOut size={18} />
@@ -627,6 +854,50 @@ export function App() {
                 </button>
               ))}
             </div>
+
+            <div className="wallet-summary">
+              <div>
+                <span>Carteira de créditos</span>
+                <strong>{creditLoading ? "Carregando..." : `${creditBalance ?? 0} créditos disponíveis`}</strong>
+              </div>
+              <Coins size={24} />
+            </div>
+
+            <div className="generation-history-block">
+              <div className="draft-panel__head draft-panel__head--compact">
+                <div>
+                  <h2>Histórico de gerações</h2>
+                  <p>Conceitos, imagens, mockups e stencils gerados nesta conta.</p>
+                </div>
+                <History size={24} />
+              </div>
+
+              {generationsLoading ? <p className="draft-empty">Carregando histórico...</p> : null}
+              {!generationsLoading && !generations.length ? (
+                <p className="draft-empty">Nenhuma geração premium salva ainda.</p>
+              ) : null}
+
+              <div className="generation-history-list">
+                {generations.slice(0, 6).map((generation) => {
+                  const image = generation.imageUrl || generation.mockupUrl || generation.stencilUrl;
+                  return (
+                    <article className="generation-history-card" key={generation.id}>
+                      {image ? <img src={image} alt={generation.tattooName || "Geração de tattoo"} /> : <Coins size={20} />}
+                      <div>
+                        <span>
+                          {generation.generationType} · {generation.status}
+                        </span>
+                        <strong>{generation.tattooName || "Tattoo simbólica"}</strong>
+                        <small>
+                          {generation.provider || "provider"} · {generation.creditsUsed || 0} créditos ·{" "}
+                          {formatGenerationDate(generation.createdAt)}
+                        </small>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
           </section>
         </main>
 
@@ -659,13 +930,22 @@ export function App() {
           activeDeliverable={activeDeliverable}
           aiResult={aiResult}
           copied={copied}
+          creditBalance={creditBalance}
+          creditCosts={creditCosts}
+          creditLoading={creditLoading}
           deliverable={selectedDeliverable}
+          generationAction={generationAction}
           generationError={generationError || draftError}
           generating={generating}
+          onBuyCredits={buyCredits}
           onCopyDeliverable={copyDeliverable}
           onCopyPrompt={copyPrompt}
           onDownloadDeliverable={downloadDeliverable}
-          onGenerate={generateConcept}
+          onGenerateConcept={generateConcept}
+          onGenerateFullPackage={generateFullPackage}
+          onGenerateImage={generateTattooImage}
+          onGenerateMockup={generateMockup}
+          onGenerateStencil={generateStencil}
           onSelectDeliverable={selectDeliverable}
           packageGenerated={packageGenerated}
           reading={reading}

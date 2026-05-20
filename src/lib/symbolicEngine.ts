@@ -33,10 +33,26 @@ export type FormState = Record<string, FormValue>;
 
 export interface AiGenerationResult {
   imageUrl?: string;
+  mockupUrl?: string;
+  stencilUrl?: string;
   imagePrompt?: string;
+  mockupPrompt?: string;
+  stencilPrompt?: string;
+  credits?: {
+    balance?: number | null;
+    used?: number;
+  };
+  generation?: {
+    id?: string;
+    status?: string;
+    generationType?: string;
+    tattooName?: string;
+    creditsUsed?: number;
+  };
   models?: {
     text?: string;
     image?: string;
+    provider?: string;
   };
   history?: {
     saved: boolean;
@@ -47,6 +63,7 @@ export interface AiGenerationResult {
     imagePrompt?: string;
     stencilPrompt?: string;
     mockupPrompt?: string;
+    premiumReport?: string;
   };
 }
 
@@ -307,7 +324,7 @@ export const createPremiumDeliverables = (
     key: "image",
     title: "Imagem IA",
     subtitle: aiResult?.imageUrl
-      ? "Imagem gerada pela OpenAI Images API."
+      ? "Imagem gerada pelo provider profissional configurado no backend."
       : "Prompt final para renderização visual da tattoo.",
     fileName: "imagem-ia",
     content: [
@@ -316,6 +333,7 @@ export const createPremiumDeliverables = (
       aiResult?.imagePrompt || reading.professionalPrompt,
       "",
       aiResult?.imageUrl ? `Imagem gerada: ${aiResult.imageUrl}` : "Imagem ainda não gerada.",
+      aiResult?.models?.provider ? `Provider: ${aiResult.models.provider}` : "",
       "",
       "Direção visual:",
       reading.cinematicConcept,
@@ -330,7 +348,10 @@ export const createPremiumDeliverables = (
       "BRIEF DE STENCIL",
       "",
       aiResult?.reading?.stencilPrompt ||
+        aiResult?.stencilPrompt ||
         `Nome da tattoo: ${reading.tattooName}\nArquétipo dominante: ${reading.dominantArchetype}\nEstilo ideal: ${reading.idealStyle}`,
+      "",
+      aiResult?.stencilUrl ? `Stencil gerado: ${aiResult.stencilUrl}` : "Stencil ainda não gerado.",
       "",
       "Instruções para o tatuador:",
       reading.bodyComposition,
@@ -345,7 +366,10 @@ export const createPremiumDeliverables = (
       "PROMPT PARA MOCKUP NO CORPO",
       "",
       aiResult?.reading?.mockupPrompt ||
+        aiResult?.mockupPrompt ||
         `Criar mockup realista da tattoo "${reading.tattooName}" aplicada no corpo.`,
+      "",
+      aiResult?.mockupUrl ? `Mockup gerado: ${aiResult.mockupUrl}` : "Mockup ainda não gerado.",
       "",
       reading.bodyComposition,
     ].join("\n"),
