@@ -402,6 +402,8 @@ button:disabled {
 
 .draft-card {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 8px;
   width: 100%;
   border: 1px solid var(--line-soft);
@@ -419,6 +421,40 @@ button:disabled {
   background:
     linear-gradient(135deg, rgba(181, 44, 36, 0.16), rgba(201, 166, 106, 0.08)),
     rgba(8, 8, 8, 0.78);
+}
+
+.draft-card__open {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+}
+
+.draft-card__delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  border: 1px solid rgba(255, 100, 92, 0.28);
+  border-radius: var(--radius);
+  background: rgba(181, 44, 36, 0.08);
+  color: #ffb7ae;
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 0 12px;
+  text-transform: uppercase;
+}
+
+.draft-card__delete:hover {
+  border-color: rgba(255, 100, 92, 0.72);
+  background: rgba(181, 44, 36, 0.18);
+  color: #ffe0dc;
 }
 
 .draft-card span {
@@ -1834,6 +1870,14 @@ textarea::placeholder {
 
   .start-actions {
     display: grid;
+  }
+
+  .draft-card {
+    grid-template-columns: 1fr;
+  }
+
+  .draft-card__delete {
+    width: 100%;
   }
 
   .premium-report-card {

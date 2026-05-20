@@ -12,6 +12,7 @@ import {
   PlusCircle,
   RefreshCw,
   Save,
+  Trash2,
   UserPlus,
 } from "lucide-react";
 import { FormModule } from "./components/FormModule";
@@ -443,6 +444,47 @@ export function App() {
     setView("form");
   };
 
+  const deleteDraft = async (draft: DraftSummary) => {
+    if (!session) {
+      setView("auth");
+      return;
+    }
+
+    const confirmed = window.confirm(`Excluir o rascunho "${draft.title}"? Essa ação não pode ser desfeita.`);
+    if (!confirmed) return;
+
+    setDraftError("");
+    setStatus("Excluindo rascunho");
+
+    try {
+      await apiFetch<{ deleted?: boolean; error?: string }>(`/api/drafts/${draft.id}`, {
+        method: "DELETE",
+        headers: authHeaders(session),
+      });
+
+      setDrafts((current) => current.filter((item) => item.id !== draft.id));
+      if (currentDraftId === draft.id) {
+        resetProjectState();
+      }
+      setStatus("Rascunho excluído");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        logout();
+        return;
+      }
+      setDraftError(error instanceof Error ? error.message : "Erro ao excluir rascunho.");
+      setStatus("Falha ao excluir rascunho");
+    }
+  };
+
+  const goToProjectSelector = () => {
+    setGenerationError("");
+    setDraftError("");
+    setStatus("Projetos salvos");
+    setView("start");
+    void refreshDrafts();
+  };
+
   const updateField = (fieldId: string, value: FormValue) => {
     setValues((current) => {
       const next = { ...current, [fieldId]: value };
@@ -667,6 +709,10 @@ export function App() {
         <div className="header-actions">
           {view === "form" ? (
             <>
+              <button className="header-link" onClick={goToProjectSelector} type="button">
+                <FolderOpen size={19} />
+                Projetos salvos
+              </button>
               <button className="header-link" type="button">
                 <HelpCircle size={19} />
                 Ajuda
@@ -845,13 +891,24 @@ export function App() {
 
             <div className="draft-list">
               {drafts.map((draft) => (
-                <button className="draft-card" key={draft.id} onClick={() => void openDraft(draft)} type="button">
-                  <span>{draft.completion}% preenchido</span>
-                  <strong>{draft.title}</strong>
-                  <small>
-                    {draft.profileGender || "Perfil em aberto"} · atualizado em {formatDraftDate(draft.updatedAt)}
-                  </small>
-                </button>
+                <article className="draft-card" key={draft.id}>
+                  <button className="draft-card__open" onClick={() => void openDraft(draft)} type="button">
+                    <span>{draft.completion}% preenchido</span>
+                    <strong>{draft.title}</strong>
+                    <small>
+                      {draft.profileGender || "Perfil em aberto"} · atualizado em {formatDraftDate(draft.updatedAt)}
+                    </small>
+                  </button>
+                  <button
+                    className="draft-card__delete"
+                    onClick={() => void deleteDraft(draft)}
+                    title="Excluir rascunho"
+                    type="button"
+                  >
+                    <Trash2 size={16} />
+                    Excluir
+                  </button>
+                </article>
               ))}
             </div>
 
